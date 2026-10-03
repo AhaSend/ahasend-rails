@@ -10,7 +10,7 @@ RAILS = ENV.fetch("RAILS_VERSION", "~> 8.0")
 gem "actionmailer", RAILS
 gem "railties", RAILS
 # CI also pins the oldest supported mail gem on one cell.
-gem "mail", ENV["MAIL_VERSION"] if ENV["MAIL_VERSION"]
+gem "mail", ENV["MAIL_VERSION"] unless ENV["MAIL_VERSION"].to_s.empty?
 
 gem "irb"
 gem "rake", "~> 13.0"
