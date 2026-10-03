@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    name: Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}
+    name: Ruby ${{ matrix.ruby }} / Rails ${{ matrix.rails }}${{ matrix.mail && format(' / mail {0}', matrix.mail) }}
     strategy:
       fail-fast: false
       matrix:
@@ -17,8 +17,13 @@ jobs:
         exclude:
           - { ruby: "3.4", rails: "~> 7.0.0" }
           - { ruby: "3.1", rails: "~> 8.0" }
+        include:
+          # Oldest supported mail gem (common in Rails 7.0 lockfiles); Bundler
+          # would otherwise always resolve the newest mail.
+          - { ruby: "3.1", rails: "~> 7.0.0", mail: "~> 2.7.0" }
     env:
       RAILS_VERSION: ${{ matrix.rails }}
+      MAIL_VERSION: ${{ matrix.mail }}
     steps:
       - uses: actions/checkout@v4
       - uses: ruby/setup-ruby@v1

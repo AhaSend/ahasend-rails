@@ -82,6 +82,13 @@ RSpec.describe AhaSend::DeliveryMethod do
       }
   end
 
+  it "raises UnexpectedResponseError when a 2xx carries no message list" do
+    stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(status: 202, body: "")
+
+    expect { described_class.new(settings).deliver!(mailer_class.welcome("u@example.com")) }
+      .to raise_error(AhaSend::UnexpectedResponseError)
+  end
+
   it "propagates API errors" do
     stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(error_response(401, "bad key"))
 

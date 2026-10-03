@@ -32,6 +32,10 @@ module AhaSend
     OPTION_HEADER_PREFIX = "ahasend-"
     TRUTHY = %w[true 1 yes on].freeze
 
+    # Options that may be set as defaults in ahasend_settings. An idempotency
+    # key must be unique per message, so it is only honoured per message.
+    DEFAULTABLE_OPTIONS = (MessageOptions::ATTRIBUTES - [:idempotency_key]).freeze
+
     def self.build(mail, defaults: {})
       new(mail, defaults: defaults).build
     end
@@ -81,7 +85,7 @@ module AhaSend
 
     # Settings-level defaults < AhaSend-* headers < message.ahasend options.
     def resolved_options
-      @defaults.slice(*MessageOptions::ATTRIBUTES)
+      @defaults.slice(*DEFAULTABLE_OPTIONS)
                .merge(header_options)
                .merge(mail.ahasend.to_h)
     end
@@ -182,9 +186,10 @@ module AhaSend
           "base64" => true
         }
         if part.inline?
-          part.cid unless part.has_content_id? # Mail assigns the Content-ID lazily
           attachment["content_disposition"] = "inline"
-          attachment["content_id"] = Mail::Utilities.unbracket(part.content_id.to_s)
+          # Part#cid assigns the Content-ID if missing and returns it without
+          # brackets, exactly as `attachments[...].url` references it.
+          attachment["content_id"] = part.cid
         end
         attachment
       end

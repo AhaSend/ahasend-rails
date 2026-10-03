@@ -68,10 +68,10 @@ RSpec.describe AhaSend::Client do
       expect(stub).to have_been_requested
     end
 
-    it "honours a custom base_url" do
-      custom = described_class.new(**settings(base_url: "http://localhost:4010"))
+    it "honours a custom base_url, including a path prefix" do
+      custom = described_class.new(**settings(base_url: "http://localhost:4010/proxy/"))
       allow(custom).to receive(:wait)
-      stub = stub_request(:post, "http://localhost:4010/v2/accounts/#{ApiHelpers::ACCOUNT_ID}/messages")
+      stub = stub_request(:post, "http://localhost:4010/proxy/v2/accounts/#{ApiHelpers::ACCOUNT_ID}/messages")
              .to_return(queued_response)
       custom.send_message(payload)
       expect(stub).to have_been_requested
@@ -98,6 +98,17 @@ RSpec.describe AhaSend::Client do
         }
         expect(stub).to have_been_requested.once
       end
+    end
+
+    it "raises IdempotencyError for 412" do
+      stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(error_response(412, "precondition"))
+      expect { client.send_message(payload) }.to raise_error(AhaSend::IdempotencyError)
+    end
+
+    it "raises IdempotencyError for a replayed 422 (payload mismatch)" do
+      stub_request(:post, ApiHelpers::MESSAGES_URL)
+        .to_return(error_response(422, "different payload", headers: { "Idempotent-Replayed" => "true" }))
+      expect { client.send_message(payload) }.to raise_error(AhaSend::IdempotencyError)
     end
 
     it "keeps a non-JSON body as a string" do
@@ -139,6 +150,23 @@ RSpec.describe AhaSend::Client do
 
       expect { client.send_message(payload) }.to raise_error(AhaSend::ServerError, /503: down/)
       expect(stub).to have_been_requested.times(3)
+    end
+
+    it "caps an excessive Retry-After" do
+      stub_request(:post, ApiHelpers::MESSAGES_URL)
+        .to_return(error_response(429, "slow", headers: { "Retry-After" => "3600" }), queued_response)
+
+      client.send_message(payload)
+
+      expect(client).to have_received(:wait).with(30.0).once
+    end
+
+    it "retries a malformed HTTP response" do
+      stub = stub_request(:post, ApiHelpers::MESSAGES_URL)
+             .to_raise(Net::HTTPBadResponse).then.to_return(queued_response)
+
+      client.send_message(payload)
+      expect(stub).to have_been_requested.twice
     end
 
     it "surfaces RateLimitError#retry_after when retries are exhausted" do

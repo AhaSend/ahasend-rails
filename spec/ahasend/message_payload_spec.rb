@@ -123,6 +123,7 @@ RSpec.describe AhaSend::MessagePayload do
 
       expect(att["content_disposition"]).to eq("inline")
       expect(att["content_id"]).to match(/\A[^<>]+\z/)
+      expect(att["content_id"]).to eq(mail.attachments["logo.png"].url.delete_prefix("cid:"))
       expect(att["file_name"]).to eq("logo.png")
       expect(att["content_type"]).to eq("image/png")
     end
@@ -201,6 +202,11 @@ RSpec.describe AhaSend::MessagePayload do
       expect(payload["sandbox"]).to be(false)
       expect(payload["tracking"]).to eq(open: false)
       expect(payload["retention"]).to eq(data: 1)
+    end
+
+    it "never takes an idempotency key from settings" do
+      built = build(simple_mail, defaults: { idempotency_key: "shared" })
+      expect(built.idempotency_key).to be_nil
     end
 
     it "ignores non-option settings keys" do

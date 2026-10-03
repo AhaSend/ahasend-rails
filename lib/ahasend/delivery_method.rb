@@ -29,6 +29,8 @@ module AhaSend
       response = client.send_message(built.payload, conversation: built.conversation?,
                                                     idempotency_key: built.idempotency_key)
       result = DeliveryResult.new(response)
+      raise UnexpectedResponseError, response if result.messages.empty?
+
       mail.message_id = result.id if result.id
       raise DeliveryError, result unless result.success?
 

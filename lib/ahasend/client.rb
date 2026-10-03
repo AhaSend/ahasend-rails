@@ -18,11 +18,14 @@ module AhaSend
     DEFAULT_READ_TIMEOUT = 30
     DEFAULT_MAX_RETRIES = 2
     MAX_BACKOFF = 8.0
+    # Longest Retry-After we are willing to sleep inside a caller's job/thread.
+    MAX_RETRY_AFTER = 30.0
 
     RETRYABLE_STATUSES = [429, 500, 502, 503, 504].freeze
     NETWORK_ERRORS = [
-      Timeout::Error, Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::EHOSTUNREACH,
-      Errno::ETIMEDOUT, Errno::EPIPE, EOFError, SocketError, IOError, OpenSSL::SSL::SSLError
+      Timeout::Error, Errno::ECONNRESET, Errno::ECONNREFUSED, Errno::ECONNABORTED, Errno::EHOSTUNREACH,
+      Errno::ENETUNREACH, Errno::ETIMEDOUT, Errno::EPIPE, EOFError, SocketError, IOError,
+      OpenSSL::SSL::SSLError, Net::HTTPBadResponse
     ].freeze
 
     attr_reader :account_id, :base_url, :open_timeout, :read_timeout, :max_retries
@@ -35,6 +38,7 @@ module AhaSend
       raise ConfigurationError, "ahasend_settings[:account_id] is required" if @account_id.empty?
 
       @base_url = (base_url || DEFAULT_BASE_URL).to_s.chomp("/")
+      @base_uri = URI.parse(@base_url)
       @open_timeout = open_timeout || DEFAULT_OPEN_TIMEOUT
       @read_timeout = read_timeout || DEFAULT_READ_TIMEOUT
       @max_retries = max_retries || DEFAULT_MAX_RETRIES
@@ -73,7 +77,8 @@ module AhaSend
     private
 
     def build_request(path, payload, idempotency_key)
-      request = Net::HTTP::Post.new(path)
+      # Keep any path prefix on base_url (e.g. a proxy mounted under /ahasend).
+      request = Net::HTTP::Post.new(@base_uri.path.chomp("/") + path)
       request["Authorization"] = "Bearer #{@api_key}"
       request["Content-Type"] = "application/json"
       request["Accept"] = "application/json"
@@ -84,9 +89,8 @@ module AhaSend
     end
 
     def perform(request)
-      uri = URI.parse(base_url)
-      http = Net::HTTP.new(uri.host, uri.port)
-      http.use_ssl = uri.scheme == "https"
+      http = Net::HTTP.new(@base_uri.host, @base_uri.port)
+      http.use_ssl = @base_uri.scheme == "https"
       http.open_timeout = open_timeout
       http.read_timeout = read_timeout
       http.request(request)
@@ -95,7 +99,7 @@ module AhaSend
     # Retry-After wins when the API sent one; otherwise exponential backoff
     # with jitter, capped so a long outage fails fast rather than hanging.
     def backoff(attempt, retry_after: nil)
-      return Float(retry_after) if retry_after&.match?(/\A\d+(\.\d+)?\z/)
+      return [Float(retry_after), MAX_RETRY_AFTER].min if retry_after&.match?(/\A\d+(\.\d+)?\z/)
 
       base = [0.5 * (2**attempt), MAX_BACKOFF].min
       base * (0.5 + (rand * 0.5))

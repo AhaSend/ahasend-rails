@@ -23,14 +23,18 @@ module AhaSend
       super(message || default_message)
     end
 
-    # Picks the most specific subclass for an HTTP status.
+    # Picks the most specific subclass for an HTTP status. The API answers
+    # idempotency-key conflicts with 409/412, and with 422 when the replayed
+    # request carries a different payload (flagged by Idempotent-Replayed);
+    # a plain 422 is ordinary validation.
     def self.for(status:, headers: {}, body: nil)
       klass =
         case status
-        when 400, 422 then ValidationError
+        when 400 then ValidationError
         when 401, 403 then AuthenticationError
         when 404 then NotFoundError
-        when 409 then IdempotencyError
+        when 409, 412 then IdempotencyError
+        when 422 then headers.key?("idempotent-replayed") ? IdempotencyError : ValidationError
         when 429 then RateLimitError
         when 500..599 then ServerError
         else ApiError
@@ -62,6 +66,18 @@ module AhaSend
     def retry_after
       value = headers["retry-after"]
       Float(value) if value&.match?(/\A\d+(\.\d+)?\z/)
+    end
+  end
+
+  # A 2xx response whose body is not the documented message list, so there is
+  # no Message-ID or per-recipient status to report. Nothing is assumed about
+  # whether the email went out; check the AhaSend dashboard or logs.
+  class UnexpectedResponseError < Error
+    attr_reader :body
+
+    def initialize(body)
+      @body = body
+      super("AhaSend returned a success status without a message list: #{body.inspect[0, 200]}")
     end
   end
 

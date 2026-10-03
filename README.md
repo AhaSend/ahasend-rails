@@ -85,7 +85,7 @@ end
 | Header | `message.ahasend` | Value |
 | --- | --- | --- |
 | `AhaSend-Tags` | `tags` | Comma-separated list / `Array<String>` |
-| `AhaSend-Track-Opens`, `AhaSend-Track-Clicks` | `tracking` | `true`/`false` / `{ open:, click: }` |
+| `AhaSend-Track-Opens`, `AhaSend-Track-Clicks` | `tracking` | Headers take `true`/`false`; Ruby takes a hash `{ open: true, click: false }` |
 | `AhaSend-Substitutions` | `substitutions` | JSON object / `Hash` — template variables for `{{ name }}` in subject and body |
 | `AhaSend-Retention-Metadata`, `AhaSend-Retention-Data` | `retention` | Days / `{ metadata:, data: }` |
 | `AhaSend-Schedule-First-Attempt`, `AhaSend-Schedule-Expires` | `schedule` | RFC 3339 timestamps / `{ first_attempt:, expires: }` |
@@ -127,7 +127,8 @@ Errors are typed, so you can rescue what you care about:
 | `AhaSend::ValidationError` | 400 / 422 — bad address, unverified domain, ... (`error.body` has the API's message) |
 | `AhaSend::AuthenticationError` | 401 / 403 |
 | `AhaSend::RateLimitError` | 429 after retries are exhausted (`error.retry_after`) |
-| `AhaSend::IdempotencyError` | 409 — the key was reused with a different payload or is still in flight |
+| `AhaSend::IdempotencyError` | 409 / 412, or 422 with `Idempotent-Replayed` — the key is still in flight, its original request failed, or it was reused with a different payload |
+| `AhaSend::UnexpectedResponseError` | 2xx without the documented message list — delivery state unknown |
 | `AhaSend::ServerError` | 5xx after retries are exhausted |
 | `AhaSend::ConnectionError` | No HTTP response (timeout, DNS, TLS); the cause is in `error.cause` |
 | `AhaSend::DeliveryError` | The API accepted the request but reported `status: "error"` for a recipient; `error.result` has the breakdown |
@@ -144,9 +145,9 @@ the API already processed is answered from its cache instead of sending the
 email again.
 
 The client retries on 429, 500, 502, 503, 504 and on network failures, waiting
-for the API's `Retry-After` when present and otherwise using exponential
-backoff with jitter (0.5 s, 1 s, 2 s, ... capped at 8 s). `max_retries: 0`
-turns this off. Client errors (400, 401, 404, ...) are never retried.
+for the API's `Retry-After` when present (capped at 30 s) and otherwise using
+exponential backoff with jitter (0.5 s, 1 s, 2 s, ... capped at 8 s).
+`max_retries: 0` turns this off. Client errors (400, 401, 404, ...) are never retried.
 
 Set your own key when you want *your* retries to be safe too, for example when
 a background job may run twice:
