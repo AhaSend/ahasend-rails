@@ -1,0 +1,44 @@
+# Publishes the gem to RubyGems.org via Trusted Publishing (OIDC) when a
+# GitHub release is published. No API key is stored anywhere: RubyGems must
+# be configured to trust this repository + workflow for the `ahasend-rails`
+# gem (RubyGems.org -> gem -> Trusted publishers -> GitHub Actions:
+# repository owner/name, workflow file "release.yml", environment "release").
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - run: bundle exec rake
+      - name: Check the tag matches AhaSend::VERSION
+        run: |
+          version=$(ruby -Ilib -e 'require "ahasend/version"; puts AhaSend::VERSION')
+          test "v$version" = "${{ github.event.release.tag_name }}" \
+            || { echo "tag ${{ github.event.release.tag_name }} != v$version"; exit 1; }
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write   # upload the built .gem to the GitHub release
+      id-token: write   # OIDC token for RubyGems trusted publishing
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.4"
+          bundler-cache: true
+      - uses: rubygems/release-gem@v1
