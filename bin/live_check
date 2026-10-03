@@ -1,0 +1,119 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Live verification of AhaSend::DeliveryMethod against the real AhaSend API.
+# Every send uses sandbox mode, so nothing is delivered.
+#
+#   AHASEND_API_KEY=... AHASEND_ACCOUNT_ID=... AHASEND_FROM_EMAIL=... bin/live_check
+#
+# Optional: AHASEND_BASE_URL to point at a non-production host.
+
+require "bundler/setup"
+require "ahasend-rails"
+require "action_mailer"
+require "json"
+
+settings = {
+  api_key: ENV.fetch("AHASEND_API_KEY"),
+  account_id: ENV.fetch("AHASEND_ACCOUNT_ID"),
+  base_url: ENV.fetch("AHASEND_BASE_URL", nil),
+  sandbox: true
+}.compact
+from_email = ENV.fetch("AHASEND_FROM_EMAIL")
+
+ActionMailer::Base.add_delivery_method(:ahasend, AhaSend::DeliveryMethod)
+ActionMailer::Base.delivery_method = :ahasend
+ActionMailer::Base.ahasend_settings = settings
+ActionMailer::Base.raise_delivery_errors = true
+ActionMailer::Base.logger = nil
+
+class LiveCheckMailer < ActionMailer::Base
+  default from: "Live Check <#{ENV.fetch("AHASEND_FROM_EMAIL")}>"
+
+  def plain(to)
+    mail(to: to, subject: "ahasend-rails live check: plain") do |format|
+      format.text { render plain: "Plain text body" }
+      format.html { render html: "<h1>HTML body</h1>".html_safe }
+    end
+  end
+
+  def tagged(to)
+    headers["AhaSend-Tags"] = "ahasend-rails-live-check"
+    headers["AhaSend-Track-Opens"] = "true"
+    message = mail(to: to, subject: "ahasend-rails live check: options", body: "tags + tracking")
+    message.ahasend.sandbox_result = "deliver"
+    message
+  end
+
+  def with_attachment(to)
+    attachments["hello.txt"] = "Hello from ahasend-rails"
+    attachments.inline["pixel.png"] = Base64.decode64(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
+    )
+    mail(to: to, subject: "ahasend-rails live check: attachments") do |format|
+      format.html { render html: %(<p>See attachment <img src="#{attachments["pixel.png"].url}"></p>).html_safe }
+    end
+  end
+
+  def conversation(to)
+    mail(to: to, cc: "cc@example.com", subject: "ahasend-rails live check: cc", body: "conversation endpoint")
+  end
+
+  def scheduled(to)
+    message = mail(to: to, subject: "ahasend-rails live check: schedule", body: "scheduled")
+    message.ahasend.schedule = { first_attempt: (Time.now.utc + 3600).iso8601 }
+    message
+  end
+
+  def unverified_sender(to)
+    mail(from: "nobody@definitely-not-verified-example.invalid", to: to,
+         subject: "ahasend-rails live check: should fail", body: "should fail")
+  end
+end
+
+def check(label)
+  puts "\n--- #{label} ---"
+  result = yield
+  if result.is_a?(AhaSend::DeliveryResult)
+    puts "OK   id=#{result.id.inspect} status=#{result.status}"
+    result.messages.each { |m| puts "     #{m.recipient}: #{m.status}#{" (#{m.error})" if m.error}" }
+  else
+    puts "OK   #{result.inspect}"
+  end
+  true
+rescue AhaSend::Error => e
+  puts "ERR  #{e.class}: #{e.message}"
+  puts "     body=#{e.body.inspect}" if e.respond_to?(:body) && e.body
+  false
+end
+
+to = "to@example.com"
+results = []
+
+results << check("plain text + html via deliver_now") do
+  message = LiveCheckMailer.plain(to)
+  message.deliver_now
+  message.message_id
+end
+results << check("tags, tracking, sandbox_result") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.tagged(to)) }
+results << check("attachment + inline image") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.with_attachment(to)) }
+results << check("cc -> conversation endpoint") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.conversation(to)) }
+results << check("scheduled delivery") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.scheduled(to)) }
+results << check("plain Mail gem") do
+  mail = Mail.new do
+    to "to@example.com"
+    subject "ahasend-rails live check: plain Mail"
+    body "no rails"
+  end
+  mail.from = from_email
+  mail.delivery_method(AhaSend::DeliveryMethod, settings)
+  mail.deliver!
+  mail.message_id
+end
+# Expected to fail: proves the typed error path against the real API.
+results << !check("unverified sender (expect ValidationError)") do
+  AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.unverified_sender(to))
+end
+
+puts "\n#{results.count(true)}/#{results.size} checks behaved as expected"
+exit(results.all? ? 0 : 1)
