@@ -1,0 +1,58 @@
+AllCops:
+  TargetRubyVersion: 3.1
+  NewCops: enable
+  SuggestExtensions: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Metrics/BlockLength:
+  Exclude: [spec/**/*, "*.gemspec"]
+
+# Repo is LF-only via .gitattributes; don't let Windows checkouts flip this.
+Layout/EndOfLine:
+  EnforcedStyle: lf
+
+# Bundler auto-requires lib/<gem-name>.rb, so the hyphen is required here.
+Naming/FileName:
+  Exclude: [lib/ahasend-rails.rb]
+
+plugins: [rubocop-rspec]
+
+RSpec/ExampleLength:
+  Max: 25
+RSpec/MultipleExpectations:
+  Enabled: false
+RSpec/NestedGroups:
+  Max: 4
+Metrics/MethodLength:
+  Max: 25
+Metrics/AbcSize:
+  Max: 32
+Metrics/ClassLength:
+  Max: 200
+Layout/LineLength:
+  Max: 130
+
+# Namespace is AhaSend (brand casing); rubocop would infer aha_send/ paths.
+RSpec/SpecFilePathFormat:
+  Enabled: false
+# Mail's DSL (`from`, `to`, ...) requires `mail` as the block receiver; and the
+# client's sleep is stubbed deliberately so retry specs don't wait.
+RSpec/VariableName:
+  Enabled: false
+RSpec/VariableDefinition:
+  Enabled: false
+RSpec/SubjectStub:
+  Enabled: false
+Style/Documentation:
+  Enabled: false
+Metrics/ParameterLists:
+  CountKeywordArgs: false
+Metrics/CyclomaticComplexity:
+  Max: 10
+Metrics/PerceivedComplexity:
+  Max: 10
