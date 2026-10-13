@@ -1,0 +1,24 @@
+{
+  "source": "components.schemas.CreateSingleMessageResponse (id is null when the message was not sent)",
+  "status": 202,
+  "headers": { "Content-Type": "application/json" },
+  "body": {
+    "object": "list",
+    "data": [
+      {
+        "object": "message",
+        "id": "<5b2d7c44-0e1a-4b6f-8f1e-6d9b3a2c4e55@example.com>",
+        "recipient": { "email": "ok@example.com", "name": "" },
+        "status": "queued",
+        "error": null
+      },
+      {
+        "object": "message",
+        "id": null,
+        "recipient": { "email": "bounced@example.com", "name": "" },
+        "status": "error",
+        "error": "recipient is suppressed"
+      }
+    ]
+  }
+}

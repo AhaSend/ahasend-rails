@@ -1,0 +1,158 @@
+{
+  "source": {
+    "repository": "https://github.com/AhaSend/docs",
+    "file": "openapi.yaml",
+    "commit": "3add235",
+    "note": "Generated from components.schemas; regenerate when the API spec changes."
+  },
+  "endpoints": {
+    "messages": {
+      "properties": [
+        "amp_content",
+        "attachments",
+        "from",
+        "headers",
+        "html_content",
+        "recipients",
+        "reply_to",
+        "retention",
+        "sandbox",
+        "sandbox_result",
+        "schedule",
+        "subject",
+        "substitutions",
+        "tags",
+        "text_content",
+        "tracking"
+      ],
+      "required": [
+        "from",
+        "recipients",
+        "subject"
+      ],
+      "arrays": {
+        "recipients": {
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "attachments": {},
+        "tags": {}
+      }
+    },
+    "conversation": {
+      "properties": [
+        "amp_content",
+        "attachments",
+        "bcc",
+        "cc",
+        "from",
+        "headers",
+        "html_content",
+        "reply_to",
+        "retention",
+        "sandbox",
+        "sandbox_result",
+        "schedule",
+        "subject",
+        "tags",
+        "text_content",
+        "to",
+        "tracking"
+      ],
+      "required": [
+        "from",
+        "subject",
+        "to"
+      ],
+      "arrays": {
+        "to": {
+          "minItems": 1,
+          "maxItems": 50
+        },
+        "cc": {
+          "minItems": 1,
+          "maxItems": 50
+        },
+        "bcc": {
+          "minItems": 1,
+          "maxItems": 50
+        },
+        "attachments": {},
+        "tags": {}
+      }
+    }
+  },
+  "schemas": {
+    "Address": {
+      "properties": [
+        "email",
+        "name"
+      ],
+      "required": [
+        "email"
+      ],
+      "arrays": {}
+    },
+    "Recipient": {
+      "properties": [
+        "email",
+        "name",
+        "substitutions"
+      ],
+      "required": [
+        "email"
+      ],
+      "arrays": {}
+    },
+    "Attachment": {
+      "properties": [
+        "base64",
+        "content_disposition",
+        "content_id",
+        "content_type",
+        "data",
+        "file_name"
+      ],
+      "required": [
+        "content_type",
+        "data",
+        "file_name"
+      ],
+      "arrays": {}
+    },
+    "Tracking": {
+      "properties": [
+        "click",
+        "open"
+      ],
+      "required": [],
+      "arrays": {}
+    },
+    "Retention": {
+      "properties": [
+        "data",
+        "metadata"
+      ],
+      "required": [],
+      "arrays": {}
+    },
+    "MessageSchedule": {
+      "properties": [
+        "expires",
+        "first_attempt"
+      ],
+      "required": [],
+      "arrays": {}
+    }
+  },
+  "rules": {
+    "attachment_content_id": {
+      "pattern": "\\A<[^<>]+>\\z",
+      "spec_text": [
+        "Content-ID that lets you reference this attachment as an inline image from your HTML.",
+        "The value **must be wrapped in angle brackets**, matching the MIME `Content-ID` header format — for example `\"<image1@example.com>\"`. Reference it from `html_content` **without** the brackets, e.g. `<img src=\"cid:image1@example.com\">`.",
+        "If the angle brackets are omitted, the file is delivered as a regular (downloadable) attachment instead of rendering inline."
+      ]
+    }
+  }
+}

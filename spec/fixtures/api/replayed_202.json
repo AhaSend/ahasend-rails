@@ -1,0 +1,17 @@
+{
+  "source": "info.description ## Idempotency: a completed stored response is replayed with its original status and body and Idempotent-Replayed: true",
+  "status": 202,
+  "headers": { "Content-Type": "application/json", "Idempotent-Replayed": "true" },
+  "body": {
+    "object": "list",
+    "data": [
+      {
+        "object": "message",
+        "id": "<9a3c5e1e-6f0b-4b9e-9a51-2c7f0e7d1a10@example.com>",
+        "recipient": { "email": "user@example.com", "name": "" },
+        "status": "queued",
+        "error": null
+      }
+    ]
+  }
+}
