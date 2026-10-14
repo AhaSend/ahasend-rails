@@ -1,0 +1,6 @@
+{
+  "source": "components.responses.IdempotencyPayloadMismatch (neither Idempotent-Replayed nor Retry-After)",
+  "status": 422,
+  "headers": { "Content-Type": "application/json" },
+  "body": { "message": "idempotency key was already used with a different request payload" }
+}

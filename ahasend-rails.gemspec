@@ -5,14 +5,14 @@ require_relative "lib/ahasend/version"
 Gem::Specification.new do |spec|
   spec.name = "ahasend-rails"
   spec.version = AhaSend::VERSION
-  spec.authors = ["Aamir Yaqoob"]
-  spec.email = ["32867470+Sameer1122@users.noreply.github.com"]
+  spec.authors = ["AhaSend", "Aamir Yaqoob"]
+  spec.email = ["support@ahasend.com"]
 
   spec.summary = "ActionMailer delivery method for the AhaSend email API (v2)"
   spec.description = "Send Rails ActionMailer and Ruby Mail messages through the AhaSend HTTP API " \
                      "instead of SMTP, with support for attachments, tags, tracking, scheduling, " \
                      "sandbox mode and idempotent retries."
-  spec.homepage = "https://github.com/Sameer1122/ahasend-rails"
+  spec.homepage = "https://github.com/AhaSend/ahasend-rails"
   spec.license = "MIT"
   spec.required_ruby_version = ">= 3.1.0"
 
@@ -36,5 +36,5 @@ Gem::Specification.new do |spec|
   # `mail` is the only hard dependency: it is what ActionMailer hands us and
   # what plain-Ruby users build messages with. ActionMailer itself is optional
   # so the delivery method works outside Rails too.
-  spec.add_dependency "mail", ">= 2.7"
+  spec.add_dependency "mail", ">= 2.7", "< 3"
 end

@@ -20,5 +20,5 @@ gem "rubocop", "~> 1.70"
 gem "rubocop-rspec", "~> 3.0"
 gem "webmock", "~> 3.24"
 
-# Windows has no zoneinfo directory; Rails boot (railtie_spec) needs it.
+# Windows has no zoneinfo directory; booting the host app (spec/scripts) needs it.
 gem "tzinfo-data", platforms: %i[mingw mswin x64_mingw windows]

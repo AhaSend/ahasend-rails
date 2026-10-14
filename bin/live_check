@@ -40,16 +40,19 @@ class LiveCheckMailer < ActionMailer::Base
   def tagged(to)
     headers["AhaSend-Tags"] = "ahasend-rails-live-check"
     headers["AhaSend-Track-Opens"] = "true"
-    message = mail(to: to, subject: "ahasend-rails live check: options", body: "tags + tracking")
+    headers["AhaSend-Metadata-Retention"] = "1" # AhaSend's SMTP header name
+    message = mail(to: to, subject: "ahasend-rails live check: options", body: "tags + tracking + retention")
     message.ahasend.sandbox_result = "deliver"
     message
   end
 
   def with_attachment(to)
     attachments["hello.txt"] = "Hello from ahasend-rails"
-    attachments.inline["pixel.png"] = Base64.decode64(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg=="
-    )
+    # Fixed Content-ID: sent as <pixel.png@ahasend-rails.test>, referenced as cid:pixel.png@ahasend-rails.test.
+    attachments.inline["pixel.png"] = {
+      content: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==".unpack1("m"),
+      content_id: "<pixel.png@ahasend-rails.test>"
+    }
     mail(to: to, subject: "ahasend-rails live check: attachments") do |format|
       format.html { render html: %(<p>See attachment <img src="#{attachments["pixel.png"].url}"></p>).html_safe }
     end
@@ -57,6 +60,10 @@ class LiveCheckMailer < ActionMailer::Base
 
   def conversation(to)
     mail(to: to, cc: "cc@example.com", subject: "ahasend-rails live check: cc", body: "conversation endpoint")
+  end
+
+  def bcc_only(to)
+    mail(bcc: [to, "bcc2@example.com"], subject: "ahasend-rails live check: bcc only", body: "one copy per bcc")
   end
 
   def scheduled(to)
@@ -98,6 +105,9 @@ end
 results << check("tags, tracking, sandbox_result") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.tagged(to)) }
 results << check("attachment + inline image") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.with_attachment(to)) }
 results << check("cc -> conversation endpoint") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.conversation(to)) }
+results << check("bcc only -> /messages, one copy each") do
+  AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.bcc_only(to))
+end
 results << check("scheduled delivery") { AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.scheduled(to)) }
 results << check("plain Mail gem") do
   mail = Mail.new do
@@ -110,8 +120,8 @@ results << check("plain Mail gem") do
   mail.deliver!
   mail.message_id
 end
-# Expected to fail: proves the typed error path against the real API.
-results << !check("unverified sender (expect ValidationError)") do
+# Expected to fail (400 or 403): proves the typed error path against the real API.
+results << !check("unverified sender (expect an API error)") do
   AhaSend::DeliveryMethod.new(settings).deliver!(LiveCheckMailer.unverified_sender(to))
 end
 
