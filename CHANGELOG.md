@@ -6,9 +6,7 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-## [0.1.0] - unreleased
-
-First release.
+First release (0.1.0).
 
 ### Added
 
@@ -28,7 +26,7 @@ First release.
 - Validation with clear errors: `ConfigurationError` for settings (checked on
   first send, not at boot), `MessageError` for malformed or unknown option
   headers/values and for messages the API cannot represent (Cc without To,
-  substitutions with Cc/Bcc).
+  substitutions with Cc/Bcc, more than 100 recipients or 50 To+Cc+Bcc).
 - `AhaSend::Client`: automatic `Idempotency-Key`; retries with `Retry-After` or
   jittered exponential backoff on 429, 5xx, network errors and in-progress
   idempotent requests (409), reusing the same key and body; typed errors
@@ -36,11 +34,12 @@ First release.
   `ForbiddenError`, `IdempotencyError`, `RateLimitError`, `ServerError`, ...).
 - `AhaSend::DeliveryResult` with per-recipient status and `replayed?`;
   responses are validated against the documented shape
-  (`UnexpectedResponseError` otherwise). `DeliveryError` when the API rejects a
-  recipient. AhaSend's Message-ID is written back to the mail.
+  (`UnexpectedResponseError` otherwise). A partial delivery (some recipients
+  rejected) returns normally and reports the rejections, so a retried job
+  cannot send duplicates; `DeliveryError` only when every recipient is
+  rejected. AhaSend's Message-ID is written back to the mail.
 - `deliver.ahasend` ActiveSupport notification linking Rails' Message-ID to
-  AhaSend's IDs and per-recipient statuses.
+  AhaSend's IDs, per-recipient statuses and rejected recipients.
 - Supported: Ruby 3.1+, Rails 7.0–8.1, and the plain `mail` gem (2.7+) without Rails.
 
-[Unreleased]: https://github.com/AhaSend/ahasend-rails/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/AhaSend/ahasend-rails/releases/tag/v0.1.0
+[Unreleased]: https://github.com/AhaSend/ahasend-rails/commits/main

@@ -35,6 +35,12 @@ config.action_mailer.ahasend_settings = {
 
 That's it. `UserMailer.welcome(user).deliver_later` now sends through AhaSend.
 
+Use `deliver_later` inside web requests. `deliver_now` waits for the API,
+including retries: with the default settings a single delivery can block for
+about two to three minutes in the worst case (three attempts, each allowed
+10 s to connect and 30 s to read, plus up to 30 s between attempts). Lower
+`max_retries` and the timeouts if you must send inline.
+
 ### Settings reference
 
 | Key | Default | Description |
@@ -126,6 +132,7 @@ to AhaSend as a message header.
 | Bcc only (no To) | `POST /messages` | Each Bcc address receives its own copy, so no recipient sees another. |
 | An explicit `smtp_envelope_to` that differs from To/Cc/Bcc | `POST /messages` | Sent **only** to the envelope addresses, one copy each; the header recipients receive nothing. This is how an interceptor redirects mail (for example to a test inbox). |
 | Cc but no To | — | `AhaSend::MessageError`: AhaSend needs a To address alongside Cc. |
+| More than 100 recipients on `/messages`, or more than 50 To + Cc + Bcc on a conversation | — | `AhaSend::MessageError`, before anything is sent. Split the send into batches. |
 | Substitutions plus Cc or Bcc | — | `AhaSend::MessageError`: the conversation endpoint does not render substitutions, so the template would go out with its `{{ }}` placeholders. Send substitutions without Cc/Bcc. |
 
 - `from`, `reply_to`, `subject`, text/HTML/AMP parts and attachments are
@@ -147,6 +154,8 @@ result.id         # => "<4f1e...@ahasend.com>"
 result.status     # => "queued" (or "scheduled")
 result.replayed?  # => true when the API answered from its idempotency store
 result.messages   # => [#<struct id:, status:, recipient:, error:, schedule:>, ...]
+result.partial?   # => true when some recipients were accepted and others rejected
+result.failed     # => the rejected entries (see Partial delivery below)
 ```
 
 Errors are typed, so you can rescue what you care about:
@@ -154,7 +163,7 @@ Errors are typed, so you can rescue what you care about:
 | Error | When |
 | --- | --- |
 | `AhaSend::ConfigurationError` | A setting is missing, invalid or unknown |
-| `AhaSend::MessageError` | The message cannot be sent as built (see above); raised before any request |
+| `AhaSend::MessageError` | The message cannot be sent as built (see above, including the recipient limits); raised before any request |
 | `AhaSend::ValidationError` | 400: the API rejected the request (`error.body` has its message) |
 | `AhaSend::AuthenticationError` | 401: the API key is missing or invalid |
 | `AhaSend::ForbiddenError` | 403: the key cannot send from this domain, the account cannot send, or sending from the domain is paused |
@@ -163,11 +172,35 @@ Errors are typed, so you can rescue what you care about:
 | `AhaSend::ServerError` | 5xx after retries are exhausted |
 | `AhaSend::ConnectionError` | No HTTP response (timeout, DNS, TLS); the cause is in `error.cause` |
 | `AhaSend::UnexpectedResponseError` | A 2xx response that is not the documented message list. **Delivery state unknown**: the email may have gone out |
-| `AhaSend::DeliveryError` | The API accepted the request but reported `status: "error"` for a recipient; `error.result` has the breakdown, and the other recipients were sent |
+| `AhaSend::DeliveryError` | The API rejected **every** recipient (`status: "error"` for each, e.g. a 553 for a blocked recipient domain); nothing was sent. `error.result` has the per-recipient errors |
 
 All of them inherit from `AhaSend::Error`. With ActionMailer's default
 `raise_delivery_errors = true` they propagate out of `deliver_now` (and fail the
 job for `deliver_later`).
+
+### Partial delivery
+
+The API can accept some recipients of a message and reject others in the same
+response. That is **not** raised: the accepted recipients are already being
+sent, and a failed `deliver_later` job would be retried with a new
+Idempotency-Key, sending them a second copy. The rejected recipients are
+reported instead, in `result.failed` (with `result.partial?`) and in the
+`deliver.ahasend` notification's `:failed_recipients` (see
+[Monitoring](#monitoring)).
+
+`AhaSend::DeliveryError` is raised only when every recipient was rejected, so
+retrying it cannot duplicate anything. A permanent rejection will fail again on
+every retry, though; to stop retrying it, handle it in your mailer
+(`ActionMailer::MailDeliveryJob` passes job exceptions to the mailer's
+`rescue_from`):
+
+```ruby
+class ApplicationMailer < ActionMailer::Base
+  rescue_from AhaSend::DeliveryError do |error|
+    Rails.logger.warn("AhaSend rejected all recipients: #{error.message}")
+  end
+end
+```
 
 ## Retries and idempotency
 
@@ -213,12 +246,13 @@ API call:
 
 ```ruby
 ActiveSupport::Notifications.subscribe("deliver.ahasend") do |event|
-  event.payload[:mail_message_id] # the ID in Rails' deliver.action_mailer event
-  event.payload[:message_ids]     # AhaSend's Message-IDs, one per recipient
-  event.payload[:recipients]      # [{ email:, status:, id:, error: }, ...]
-  event.payload[:replayed]        # true when answered from the idempotency store
-  event.payload[:endpoint]        # :messages or :conversation
-  event.payload[:sandbox]         # true for sandbox sends
+  event.payload[:mail_message_id]   # the ID in Rails' deliver.action_mailer event
+  event.payload[:message_ids]       # AhaSend's Message-IDs, one per recipient
+  event.payload[:recipients]        # [{ email:, status:, id:, error: }, ...]
+  event.payload[:failed_recipients] # emails the API rejected, e.g. in a partial delivery
+  event.payload[:replayed]          # true when answered from the idempotency store
+  event.payload[:endpoint]          # :messages or :conversation
+  event.payload[:sandbox]           # true for sandbox sends
 end
 ```
 
