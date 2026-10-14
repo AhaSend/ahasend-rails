@@ -44,6 +44,10 @@ RSpec.describe "API request contract" do # rubocop:disable RSpec/DescribeClass
       expect(built.payload[field].size).to be >= limits.fetch("minItems", 0)
       expect(built.payload[field].size).to be <= limits.fetch("maxItems", Float::INFINITY)
     end
+    if built.conversation?
+      total = built.payload.values_at("to", "cc", "bcc").compact.sum(&:size)
+      expect(total).to be <= request_contract.dig("rules", "conversation_total_recipients", "max")
+    end
     expect_nested_conforming(built.payload)
     built
   end
@@ -99,6 +103,20 @@ RSpec.describe "API request contract" do # rubocop:disable RSpec/DescribeClass
     mail.smtp_envelope_to = "test-inbox@example.com"
 
     expect(expect_conforming(mail).endpoint).to eq(:messages)
+  end
+
+  it "conforms at the recipient limits, and the gem refuses to build past them" do
+    to_only = base_mail
+    to_only.to = Array.new(100) { |i| "r#{i}@example.com" }
+    expect(expect_conforming(to_only).payload["recipients"].size).to eq(100)
+
+    conversation = base_mail
+    conversation.to = Array.new(49) { |i| "r#{i}@example.com" }
+    conversation.cc = "cc@example.com"
+    expect(expect_conforming(conversation)).to be_conversation
+
+    conversation.bcc = "one-too-many@example.com"
+    expect { AhaSend::MessagePayload.build(conversation) }.to raise_error(AhaSend::MessageError, /at most 50/)
   end
 
   it "records where the contract came from" do

@@ -86,6 +86,12 @@ def stub_api(status: 202)
 
     emails = (body["recipients"] || body.values_at("to", "cc", "bcc").compact.flatten).map { |r| r["email"] }
     data = emails.each_with_index.map do |email, i|
+      # A recipient domain AhaSend refuses: rejected in the 202, the rest are queued.
+      if email.end_with?("@blocked.test")
+        next { "object" => "message", "id" => nil, "status" => "error", "recipient" => { "email" => email, "name" => "" },
+               "error" => "553 recipient domain is blocked" }
+      end
+
       { "object" => "message", "id" => "<#{i}@ahasend.test>", "status" => "queued",
         "recipient" => { "email" => email, "name" => "" }, "error" => nil }
     end
@@ -132,6 +138,25 @@ check("deliver_later") do
     "requests" => REQUESTS.size, "recipients" => recipients(request),
     "options" => request["body"].slice("tags", "tracking"), "idempotency_key_sent" => !request["idempotency_key"].to_s.empty? }
 ensure
+  adapter.perform_enqueued_jobs = false
+end
+
+# A partial rejection must not fail the job: a retried job would send the
+# accepted recipients a second copy under a new Idempotency-Key.
+check("partial_failure_deliver_later") do
+  stub_api
+  adapter = ActiveJob::Base.queue_adapter
+  adapter.perform_enqueued_jobs = true
+  failed = nil
+  subscriber = ActiveSupport::Notifications.subscribe("deliver.ahasend") { |*args| failed = args.last[:failed_recipients] }
+  performed_before = adapter.performed_jobs.size
+  WelcomeMailer.welcome(["ok@user.test", "someone@blocked.test"]).deliver_later
+  { "raised" => false, "jobs_performed" => adapter.performed_jobs.size - performed_before,
+    "requests" => REQUESTS.size, "failed_recipients" => failed }
+rescue StandardError => e
+  { "raised" => e.class.name }
+ensure
+  ActiveSupport::Notifications.unsubscribe(subscriber) if subscriber
   adapter.perform_enqueued_jobs = false
 end
 

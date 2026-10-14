@@ -31,7 +31,14 @@ module AhaSend
     def id = messages.first.id
     def status = messages.first.status
     def failed = messages.select(&:error?)
+    def accepted = messages.reject(&:error?)
     def success? = failed.empty?
+
+    # Some recipients were accepted and others rejected. The accepted ones
+    # are being sent, so this is not raised as an error (a retried job would
+    # send them a second copy); the rejections are in #failed and in the
+    # deliver.ahasend notification.
+    def partial? = failed.any? && accepted.any?
 
     # True when the API answered from its idempotency store: this exact
     # request (same Idempotency-Key) had already been processed, and these
@@ -44,6 +51,7 @@ module AhaSend
       {
         message_ids: messages.map(&:id).compact,
         recipients: messages.map { |m| { email: m.recipient, status: m.status, id: m.id, error: m.error } },
+        failed_recipients: failed.map(&:recipient),
         replayed: replayed?
       }
     end

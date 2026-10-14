@@ -75,6 +75,30 @@ RSpec.describe AhaSend::MessagePayload do
     end
   end
 
+  describe "recipient limits" do
+    def addresses(count, prefix = "r") = Array.new(count) { |i| "#{prefix}#{i}@example.com" }
+
+    it "accepts 100 recipients on /messages and rejects 101 before sending" do
+      expect(build(simple_mail(to: addresses(100))).payload["recipients"].size).to eq(100)
+      expect { build(simple_mail(to: addresses(101))) }
+        .to raise_error(AhaSend::MessageError, /101 recipients; AhaSend accepts at most 100/)
+    end
+
+    it "applies the 100 limit to Bcc-only mail and to an envelope override" do
+      expect { build(simple_mail(to: nil, bcc: addresses(101))) }.to raise_error(AhaSend::MessageError, /at most 100/)
+
+      redirected = simple_mail
+      redirected.smtp_envelope_to = addresses(101, "inbox")
+      expect { build(redirected) }.to raise_error(AhaSend::MessageError, /at most 100/)
+    end
+
+    it "accepts 50 To+Cc+Bcc recipients on the conversation endpoint and rejects 51" do
+      expect(build(simple_mail(to: addresses(30), cc: addresses(10, "c"), bcc: addresses(10, "b")))).to be_conversation
+      expect { build(simple_mail(to: addresses(30), cc: addresses(10, "c"), bcc: addresses(11, "b"))) }
+        .to raise_error(AhaSend::MessageError, %r{51 To/Cc/Bcc recipients; AhaSend accepts at most 50})
+    end
+  end
+
   describe "SMTP envelope override (smtp_envelope_to)" do
     it "delivers only to the envelope addresses, never to the header recipients" do
       mail = simple_mail(cc: "boss@example.com", bcc: "audit@example.com")

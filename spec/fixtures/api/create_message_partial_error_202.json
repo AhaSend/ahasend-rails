@@ -1,5 +1,5 @@
 {
-  "source": "components.schemas.CreateSingleMessageResponse (id is null when the message was not sent)",
+  "source": "components.schemas.CreateSingleMessageResponse (id is null when the message was not sent). A 202 can mix accepted and rejected recipients, e.g. a 553 for a blocked recipient domain; suppressed recipients are queued and fail later, at delivery. The error text is illustrative.",
   "status": 202,
   "headers": { "Content-Type": "application/json" },
   "body": {
@@ -15,9 +15,9 @@
       {
         "object": "message",
         "id": null,
-        "recipient": { "email": "bounced@example.com", "name": "" },
+        "recipient": { "email": "user@blocked.example", "name": "" },
         "status": "error",
-        "error": "recipient is suppressed"
+        "error": "553 recipient domain is blocked"
       }
     ]
   }

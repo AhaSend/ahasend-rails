@@ -146,6 +146,10 @@
     }
   },
   "rules": {
+    "conversation_total_recipients": {
+      "max": 50,
+      "spec_text": "This parameter can set the `To` header to multiple addresses. The combined to, cc, and bcc recipient count must not exceed 50."
+    },
     "attachment_content_id": {
       "pattern": "\\A<[^<>]+>\\z",
       "spec_text": [

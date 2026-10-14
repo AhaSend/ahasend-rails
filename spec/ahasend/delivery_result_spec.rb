@@ -19,12 +19,22 @@ RSpec.describe AhaSend::DeliveryResult do
     expect(result.messages.map(&:recipient)).to eq(["user@example.com"])
   end
 
-  it "accepts an error entry without an ID and reports it as failed" do
+  it "accepts an error entry without an ID and reports a partial delivery" do
     result = described_class.new(fixture_body("create_message_partial_error_202"))
 
     expect(result).not_to be_success
-    expect(result.failed.map(&:recipient)).to eq(["bounced@example.com"])
+    expect(result).to be_partial
+    expect(result.accepted.map(&:recipient)).to eq(["ok@example.com"])
+    expect(result.failed.map(&:recipient)).to eq(["user@blocked.example"])
     expect(result.failed.first.id).to be_nil
+    expect(result.to_notification[:failed_recipients]).to eq(["user@blocked.example"])
+  end
+
+  it "is not partial when every recipient was rejected" do
+    result = described_class.new({ "data" => [entry(id: nil, status: "error", error: "553 blocked")] })
+
+    expect(result).not_to be_partial
+    expect(result.accepted).to be_empty
   end
 
   it "accepts scheduled entries" do
@@ -38,6 +48,7 @@ RSpec.describe AhaSend::DeliveryResult do
     expect(result.to_notification).to eq(
       message_ids: ["<a@ahasend.com>"],
       recipients: [{ email: "a@example.com", status: "queued", id: "<a@ahasend.com>", error: nil }],
+      failed_recipients: [],
       replayed: true
     )
   end

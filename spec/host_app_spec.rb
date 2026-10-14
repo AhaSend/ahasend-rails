@@ -34,6 +34,12 @@ RSpec.describe "Rails host application" do # rubocop:disable RSpec/DescribeClass
     )
   end
 
+  it "completes a deliver_later job when only some recipients are rejected, so it is not retried" do
+    expect(scenario("partial_failure_deliver_later")).to eq(
+      "raised" => false, "jobs_performed" => 1, "requests" => 1, "failed_recipients" => ["someone@blocked.test"]
+    )
+  end
+
   it "sends to the recipients an interceptor rewrote" do
     expect(scenario("interceptor_to")).to eq("recipients" => ["qa@acme.test"])
   end
@@ -70,6 +76,7 @@ RSpec.describe "Rails host application" do # rubocop:disable RSpec/DescribeClass
     expect(result["ahasend_mail_message_id"]).to eq(result["rails_message_id"])
     expect(result["ahasend_message_ids"]).to eq(["<0@ahasend.test>"])
     expect(result["final_message_id"]).to eq("0@ahasend.test")
-    expect(result["payload_keys"]).to eq(%w[endpoint mail_message_id message_ids recipients replayed sandbox])
+    expect(result["payload_keys"])
+      .to eq(%w[endpoint failed_recipients mail_message_id message_ids recipients replayed sandbox])
   end
 end

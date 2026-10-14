@@ -18,8 +18,8 @@ module AhaSend
     # ActiveSupport::Notifications event emitted around every API call, when
     # ActiveSupport is loaded. Payload: :mail_message_id (the ID Rails logged
     # in deliver.action_mailer), :endpoint, :sandbox, and after a response
-    # :message_ids, :recipients (email/status/id/error) and :replayed. No
-    # credentials or message content.
+    # :message_ids, :recipients (email/status/id/error), :failed_recipients
+    # and :replayed. No credentials or message content.
     NOTIFICATION = "deliver.ahasend"
 
     attr_reader :settings
@@ -29,7 +29,14 @@ module AhaSend
     end
 
     # Sends the message and returns an AhaSend::DeliveryResult. The
-    # Message-ID assigned by AhaSend is written back onto the mail object.
+    # Message-ID AhaSend assigned to the first accepted recipient is written
+    # back onto the mail object.
+    #
+    # Raises DeliveryError only when the API rejected every recipient. When
+    # some were accepted it returns normally: raising would make a retried
+    # job (which sends with a new Idempotency-Key) deliver a second copy to
+    # the recipients who already got one. The rejected recipients are in
+    # DeliveryResult#failed and the notification's :failed_recipients.
     def deliver!(mail)
       built = MessagePayload.build(mail, defaults: settings.except(*Client::SETTINGS))
       instrument(mail, built) do |event|
@@ -37,9 +44,9 @@ module AhaSend
                                                       idempotency_key: built.idempotency_key)
         result = DeliveryResult.from_response(response)
         event.merge!(result.to_notification)
-        mail.message_id = result.id if result.id
-        raise DeliveryError, result unless result.success?
+        raise DeliveryError, result if result.accepted.empty?
 
+        mail.message_id = result.accepted.first.id
         result
       end
     end

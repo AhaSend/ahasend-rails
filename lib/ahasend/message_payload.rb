@@ -35,6 +35,11 @@ module AhaSend
 
     OPTION_FIELDS = %i[tags substitutions tracking retention schedule sandbox sandbox_result].freeze
 
+    # Per-request recipient limits (CreateMessageRequest.recipients and the
+    # conversation endpoint's combined To + Cc + Bcc).
+    MAX_RECIPIENTS = 100
+    MAX_CONVERSATION_RECIPIENTS = 50
+
     def self.build(mail, defaults: {})
       new(mail, defaults: defaults).build
     end
@@ -51,6 +56,7 @@ module AhaSend
         Options.from_message_options(mail.ahasend)
       )
       conversation, recipients = routing
+      check_recipient_limit!(conversation, recipients)
       if conversation && !options.fetch(:substitutions, {}).empty?
         raise MessageError,
               "substitutions cannot be combined with Cc/Bcc: AhaSend's conversation endpoint does not support " \
@@ -79,6 +85,19 @@ module AhaSend
       # Bcc only: an individual message per address keeps them hidden from
       # each other, which the conversation endpoint (To required) cannot do.
       [false, { "recipients" => bcc }]
+    end
+
+    # The API rejects larger requests with a 400; fail before sending instead.
+    def check_recipient_limit!(conversation, recipients)
+      count = recipients.values.sum(&:size)
+      if conversation && count > MAX_CONVERSATION_RECIPIENTS
+        raise MessageError, "the message has #{count} To/Cc/Bcc recipients; AhaSend accepts at most " \
+                            "#{MAX_CONVERSATION_RECIPIENTS} in total on a message with Cc or Bcc"
+      end
+      return if conversation || count <= MAX_RECIPIENTS
+
+      raise MessageError, "the message has #{count} recipients; AhaSend accepts at most #{MAX_RECIPIENTS} " \
+                          "per message, so send it in batches"
     end
 
     def header_routing(to, cc, bcc)

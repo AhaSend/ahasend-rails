@@ -82,14 +82,44 @@ RSpec.describe AhaSend::DeliveryMethod do
     expect(described_class.new(settings).deliver!(mailer_class.welcome("user@example.com"))).to be_replayed
   end
 
-  it "raises DeliveryError when the API reports a recipient error" do
-    stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(api_fixture("create_message_partial_error_202"))
+  describe "when the API rejects recipients" do
+    it "does not raise when some recipients were accepted, so a retried job cannot send them a second copy" do
+      stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(api_fixture("create_message_partial_error_202"))
+      message = mailer_class.welcome(%w[ok@example.com user@blocked.example]).message
 
-    expect { described_class.new(settings).deliver!(mailer_class.welcome(%w[ok@example.com bounced@example.com])) }
-      .to raise_error(AhaSend::DeliveryError,
-                      "AhaSend rejected 1 of 2 recipient(s): bounced@example.com: recipient is suppressed") { |e|
-        expect(e.result.failed.map(&:recipient)).to eq(["bounced@example.com"])
-      }
+      events = capture_notifications("deliver.ahasend") do
+        result = described_class.new(settings).deliver!(message)
+        expect(result).to be_partial
+        expect(result.failed.map(&:recipient)).to eq(["user@blocked.example"])
+      end
+
+      expect(message.message_id).to eq("5b2d7c44-0e1a-4b6f-8f1e-6d9b3a2c4e55@example.com")
+      expect(events.first[:failed_recipients]).to eq(["user@blocked.example"])
+      expect(events.first).not_to include(:exception)
+    end
+
+    it "does not raise from deliver_now either" do
+      stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(api_fixture("create_message_partial_error_202"))
+
+      expect { mailer_class.welcome(%w[ok@example.com user@blocked.example]).deliver_now }.not_to raise_error
+    end
+
+    it "raises DeliveryError when every recipient was rejected (nothing was sent)" do
+      rejected = { "object" => "message", "id" => nil, "status" => "error",
+                   "recipient" => { "email" => "user@blocked.example", "name" => "" },
+                   "error" => "553 recipient domain is blocked" }
+      stub_request(:post, ApiHelpers::MESSAGES_URL)
+        .to_return(status: 202, body: JSON.generate("object" => "list", "data" => [rejected]))
+      message = mailer_class.welcome("user@blocked.example").message
+      original_id = message.message_id
+
+      expect { described_class.new(settings).deliver!(message) }
+        .to raise_error(AhaSend::DeliveryError,
+                        "AhaSend rejected 1 of 1 recipient(s): user@blocked.example: 553 recipient domain is blocked") { |e|
+          expect(e.result.accepted).to be_empty
+        }
+      expect(message.message_id).to eq(original_id)
+    end
   end
 
   it "raises UnexpectedResponseError and keeps Mail's Message-ID when a 2xx is malformed" do
@@ -151,6 +181,7 @@ RSpec.describe AhaSend::DeliveryMethod do
         mail_message_id: rails_id, endpoint: :messages, sandbox: false,
         message_ids: ["<n-example.com@ahasend.com>"],
         recipients: [{ email: "n@example.com", status: "queued", id: "<n-example.com@ahasend.com>", error: nil }],
+        failed_recipients: [],
         replayed: false
       )
     end

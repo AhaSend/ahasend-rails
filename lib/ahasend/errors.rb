@@ -118,9 +118,12 @@ module AhaSend
     end
   end
 
-  # The API accepted the request (202) but reported `status: "error"` for one
-  # or more recipients. `result` holds the full per-recipient breakdown; any
-  # recipient that was queued has still been sent.
+  # The API accepted the request (202) but rejected every recipient
+  # (`status: "error"` for each). Nothing was sent, so retrying cannot
+  # duplicate anything; a permanent rejection (such as a blocked recipient
+  # domain) will fail again, though. `result` holds the per-recipient errors.
+  # When only some recipients are rejected, nothing is raised: see
+  # DeliveryResult#partial?.
   class DeliveryError < Error
     attr_reader :result
 
