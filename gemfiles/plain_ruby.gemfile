@@ -1,0 +1,9 @@
+# frozen_string_literal: true
+
+# Plain-Ruby CI job: the gem and the mail gem only, no Rails installed, to
+# prove nothing depends on Rails being present.
+source "https://rubygems.org"
+
+gemspec path: ".."
+
+gem "webmock", "~> 3.24"
