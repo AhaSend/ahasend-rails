@@ -10,7 +10,10 @@ module AhaSend
   class DeliveryResult
     STATUSES = %w[queued scheduled error].freeze
 
-    Message = Struct.new(:id, :status, :recipient, :error, :schedule, keyword_init: true) do
+    # `id` is AhaSend's ID for the message, which Get Message and Cancel
+    # Message take; `message_id_header` is the Message-ID header of the email
+    # sent. Both are nil for a rejected recipient.
+    Message = Struct.new(:id, :message_id_header, :status, :recipient, :error, :schedule, keyword_init: true) do
       def error? = status == "error"
     end
 
@@ -26,9 +29,10 @@ module AhaSend
       @messages = parse_messages(raw)
     end
 
-    # RFC 822 Message-ID of the first message, e.g. "<uuid@example.com>"
-    # (nil when that recipient was rejected).
+    # The first message's ID and Message-ID header (nil when that recipient
+    # was rejected).
     def id = messages.first.id
+    def message_id_header = messages.first.message_id_header
     def status = messages.first.status
     def failed = messages.select(&:error?)
     def accepted = messages.reject(&:error?)
@@ -50,7 +54,9 @@ module AhaSend
     def to_notification
       {
         message_ids: messages.map(&:id).compact,
-        recipients: messages.map { |m| { email: m.recipient, status: m.status, id: m.id, error: m.error } },
+        recipients: messages.map do |m|
+          { email: m.recipient, status: m.status, id: m.id, message_id_header: m.message_id_header, error: m.error }
+        end,
         failed_recipients: failed.map(&:recipient),
         replayed: replayed?
       }
@@ -75,8 +81,18 @@ module AhaSend
       return unless recipient.is_a?(Hash) && recipient["email"].is_a?(String)
       return unless valid_id?(entry) && (entry["error"].nil? || entry["error"].is_a?(String))
 
-      Message.new(id: entry["id"], status: entry["status"], recipient: recipient["email"], error: entry["error"],
-                  schedule: entry["schedule"])
+      header = header_of(entry)
+      return unless header.nil? || header.is_a?(String)
+
+      Message.new(id: entry["id"], message_id_header: header, status: entry["status"], recipient: recipient["email"],
+                  error: entry["error"], schedule: entry["schedule"])
+    end
+
+    # The older response form has no `message_id_header` and gives the
+    # Message-ID header as `id`. A request repeated with an earlier
+    # Idempotency-Key can still return it for 24 hours after the API change.
+    def header_of(entry)
+      entry.fetch("message_id_header") { entry["id"] }
     end
 
     def valid_id?(entry)

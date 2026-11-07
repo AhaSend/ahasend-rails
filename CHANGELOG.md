@@ -37,7 +37,8 @@ First release (0.1.0).
   (`UnexpectedResponseError` otherwise). A partial delivery (some recipients
   rejected) returns normally and reports the rejections, so a retried job
   cannot send duplicates; `DeliveryError` only when every recipient is
-  rejected. AhaSend's Message-ID is written back to the mail.
+  rejected. Each entry has the message's `id` and its `message_id_header`;
+  the Message-ID header is written back to the mail.
 - `deliver.ahasend` ActiveSupport notification linking Rails' Message-ID to
   AhaSend's IDs, per-recipient statuses and rejected recipients.
 - Supported: Ruby 3.1+, Rails 7.0–8.1, and the plain `mail` gem (2.7+) without Rails.

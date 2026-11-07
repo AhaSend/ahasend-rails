@@ -19,7 +19,8 @@ abort "plain ruby check failed: #{loaded.join(", ")} loaded" unless loaded.empty
 stub = stub_request(:post, "https://api.ahasend.com/v2/accounts/acc-1/messages").to_return(
   status: 202,
   headers: { "Content-Type" => "application/json" },
-  body: JSON.generate("object" => "list", "data" => [{ "object" => "message", "id" => "<1@ahasend.test>", "status" => "queued",
+  body: JSON.generate("object" => "list", "data" => [{ "object" => "message", "id" => "id-1",
+                                                       "message_id_header" => "<1@ahasend.test>", "status" => "queued",
                                                        "recipient" => { "email" => "user@example.com", "name" => "" },
                                                        "error" => nil }])
 )

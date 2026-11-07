@@ -7,7 +7,8 @@
     "data": [
       {
         "object": "message",
-        "id": "<5b2d7c44-0e1a-4b6f-8f1e-6d9b3a2c4e55@example.com>",
+        "id": "5b2d7c44-0e1a-4b6f-8f1e-6d9b3a2c4e55",
+        "message_id_header": "<5b2d7c44-0e1a-4b6f-8f1e-6d9b3a2c4e55@example.com>",
         "recipient": { "email": "ok@example.com", "name": "" },
         "status": "queued",
         "error": null
@@ -15,6 +16,7 @@
       {
         "object": "message",
         "id": null,
+        "message_id_header": null,
         "recipient": { "email": "user@blocked.example", "name": "" },
         "status": "error",
         "error": "553 recipient domain is blocked"

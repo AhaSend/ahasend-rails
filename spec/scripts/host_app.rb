@@ -88,11 +88,11 @@ def stub_api(status: 202)
     data = emails.each_with_index.map do |email, i|
       # A recipient domain AhaSend refuses: rejected in the 202, the rest are queued.
       if email.end_with?("@blocked.test")
-        next { "object" => "message", "id" => nil, "status" => "error", "recipient" => { "email" => email, "name" => "" },
-               "error" => "553 recipient domain is blocked" }
+        next { "object" => "message", "id" => nil, "message_id_header" => nil, "status" => "error",
+               "recipient" => { "email" => email, "name" => "" }, "error" => "553 recipient domain is blocked" }
       end
 
-      { "object" => "message", "id" => "<#{i}@ahasend.test>", "status" => "queued",
+      { "object" => "message", "id" => "id-#{i}", "message_id_header" => "<#{i}@ahasend.test>", "status" => "queued",
         "recipient" => { "email" => email, "name" => "" }, "error" => nil }
     end
     { status: 202, body: JSON.generate("object" => "list", "data" => data), headers: { "Content-Type" => "application/json" } }

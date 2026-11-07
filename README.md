@@ -140,7 +140,7 @@ to AhaSend as a message header.
 - Inline images (`attachments.inline[...]`, referenced from the HTML with
   `attachments["logo.png"].url`) are sent with their MIME Content-ID in angle
   brackets, which is what makes them render inline.
-- AhaSend assigns the `Message-ID`; after delivery it is available as
+- AhaSend assigns the `Message-ID` header; after delivery it is available as
   `message.message_id`.
 
 ## Delivery results and errors
@@ -150,13 +150,18 @@ an `AhaSend::DeliveryResult` with one entry per recipient:
 
 ```ruby
 result = AhaSend::DeliveryMethod.new(settings).deliver!(mail)
-result.id         # => "<4f1e...@ahasend.com>"
-result.status     # => "queued" (or "scheduled")
-result.replayed?  # => true when the API answered from its idempotency store
-result.messages   # => [#<struct id:, status:, recipient:, error:, schedule:>, ...]
-result.partial?   # => true when some recipients were accepted and others rejected
-result.failed     # => the rejected entries (see Partial delivery below)
+result.id                # => "4f1e..." (the message's ID)
+result.message_id_header # => "<4f1e...@yourdomain.com>" (the email's Message-ID header)
+result.status            # => "queued" (or "scheduled")
+result.replayed?         # => true when the API answered from its idempotency store
+result.messages          # => [#<struct id:, message_id_header:, status:, recipient:, error:, schedule:>, ...]
+result.partial?          # => true when some recipients were accepted and others rejected
+result.failed            # => the rejected entries (see Partial delivery below)
 ```
+
+`id` is the ID that AhaSend's Get Message and Cancel Message endpoints take,
+and that message webhooks carry as `data.id`. `message_id_header` is the
+`Message-ID` header of the email itself.
 
 Errors are typed, so you can rescue what you care about:
 
@@ -247,8 +252,8 @@ API call:
 ```ruby
 ActiveSupport::Notifications.subscribe("deliver.ahasend") do |event|
   event.payload[:mail_message_id]   # the ID in Rails' deliver.action_mailer event
-  event.payload[:message_ids]       # AhaSend's Message-IDs, one per recipient
-  event.payload[:recipients]        # [{ email:, status:, id:, error: }, ...]
+  event.payload[:message_ids]       # AhaSend's message IDs, one per recipient
+  event.payload[:recipients]        # [{ email:, status:, id:, message_id_header:, error: }, ...]
   event.payload[:failed_recipients] # emails the API rejected, e.g. in a partial delivery
   event.payload[:replayed]          # true when answered from the idempotency store
   event.payload[:endpoint]          # :messages or :conversation

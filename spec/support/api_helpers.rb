@@ -22,11 +22,13 @@ module ApiHelpers
     @request_contract ||= JSON.parse(File.read(File.join(FIXTURES, "request_contract.json")))
   end
 
-  # A valid send response with one queued entry per recipient.
+  # A valid send response with one queued entry per recipient: `id` is the
+  # message's ID, `message_id_header` the Message-ID header of its email.
   def queued_response(*emails, status: "queued")
     emails = ["user@example.com"] if emails.empty?
     data = emails.map do |email|
-      { "object" => "message", "id" => "<#{email.tr("@", "-")}@ahasend.com>", "status" => status,
+      { "object" => "message", "id" => "id-#{email.tr("@", "-")}",
+        "message_id_header" => "<#{email.tr("@", "-")}@ahasend.com>", "status" => status,
         "recipient" => { "email" => email, "name" => "" }, "error" => nil }
     end
     { status: 202, body: JSON.generate("object" => "list", "data" => data),

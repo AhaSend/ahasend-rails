@@ -43,6 +43,25 @@ RSpec.describe AhaSend::DeliveryMethod do
     expect(message.message_id).to eq("someone-example.com@ahasend.com")
   end
 
+  it "writes back the Message-ID header, not the message's ID" do
+    stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(api_fixture("create_message_202"))
+    message = mailer_class.welcome("user@example.com").message
+
+    result = described_class.new(settings).deliver!(message)
+
+    expect(result.id).to eq("9a3c5e1e-6f0b-4b9e-9a51-2c7f0e7d1a10")
+    expect(message.message_id).to eq("9a3c5e1e-6f0b-4b9e-9a51-2c7f0e7d1a10@example.com")
+  end
+
+  it "writes back the Message-ID header from id in the older response form" do
+    stub_request(:post, ApiHelpers::MESSAGES_URL).to_return(api_fixture("create_message_legacy_id_202"))
+    message = mailer_class.welcome("user@example.com").message
+
+    described_class.new(settings).deliver!(message)
+
+    expect(message.message_id).to eq("9a3c5e1e-6f0b-4b9e-9a51-2c7f0e7d1a10@example.com")
+  end
+
   it "routes mails with cc through the conversation endpoint" do
     stub = stub_request(:post, ApiHelpers::CONVERSATION_URL).to_return(queued_response("a@example.com", "c@example.com"))
 
@@ -179,8 +198,9 @@ RSpec.describe AhaSend::DeliveryMethod do
       expect(events.size).to eq(1)
       expect(events.first).to eq(
         mail_message_id: rails_id, endpoint: :messages, sandbox: false,
-        message_ids: ["<n-example.com@ahasend.com>"],
-        recipients: [{ email: "n@example.com", status: "queued", id: "<n-example.com@ahasend.com>", error: nil }],
+        message_ids: ["id-n-example.com"],
+        recipients: [{ email: "n@example.com", status: "queued", id: "id-n-example.com",
+                       message_id_header: "<n-example.com@ahasend.com>", error: nil }],
         failed_recipients: [],
         replayed: false
       )
