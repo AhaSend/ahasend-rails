@@ -42,3 +42,7 @@ jobs:
           ruby-version: "3.4"
           bundler-cache: true
       - uses: rubygems/release-gem@v1
+        with:
+          # RubyGems.org account ID of the gem's owner (AhaSend). Required for
+          # the first push through a pending trusted publisher; ignored after.
+          owner: "256643"
