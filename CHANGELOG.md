@@ -6,7 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-First release (0.1.0).
+## [0.1.0] - 2026-11-25
+
+First release.
 
 ### Added
 
@@ -43,4 +45,5 @@ First release (0.1.0).
   AhaSend's IDs, per-recipient statuses and rejected recipients.
 - Supported: Ruby 3.1+, Rails 7.0–8.1, and the plain `mail` gem (2.7+) without Rails.
 
-[Unreleased]: https://github.com/AhaSend/ahasend-rails/commits/main
+[Unreleased]: https://github.com/AhaSend/ahasend-rails/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/AhaSend/ahasend-rails/releases/tag/v0.1.0
