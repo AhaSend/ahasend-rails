@@ -1,0 +1,6 @@
+{
+  "source": "components.responses.IdempotencyConflict (always Idempotent-Replayed: false plus a positive integer Retry-After)",
+  "status": 409,
+  "headers": { "Content-Type": "application/json", "Idempotent-Replayed": "false", "Retry-After": "2" },
+  "body": { "message": "A request with this idempotency key is already in progress" }
+}

@@ -1,0 +1,6 @@
+{
+  "source": "paths./v2/accounts/{account_id}/messages.post.responses.403.examples.domain_paused",
+  "status": 403,
+  "headers": { "Content-Type": "application/json" },
+  "body": { "message": "Sending from domain 'example.com' is paused. Check your dashboard for the reason." }
+}

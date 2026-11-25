@@ -32,6 +32,7 @@ Metrics/MethodLength:
   Max: 25
 Metrics/AbcSize:
   Max: 32
+  Exclude: [spec/**/*]
 Metrics/ClassLength:
   Max: 200
 Layout/LineLength:
@@ -56,3 +57,13 @@ Metrics/CyclomaticComplexity:
   Max: 10
 Metrics/PerceivedComplexity:
   Max: 10
+
+# Standalone scripts run in their own process by the specs (and CI); they are
+# not RSpec files.
+RSpec:
+  Exclude: [spec/scripts/**/*]
+
+# Options is one cohesive validator (parse, validate, merge the three option
+# layers); splitting it would scatter the rules.
+Metrics/ModuleLength:
+  Exclude: [lib/ahasend/options.rb]
